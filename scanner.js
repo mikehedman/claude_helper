@@ -37,7 +37,7 @@ function resolveSegments(base, segs) {
 
 function decodeProjDir(dirName) {
   const home = process.env.HOME
-  const encodedHome = home.slice(1).replace(/\//g, '-')  // "/Users/tony.hoff" → "Users-tony.hoff"
+  const encodedHome = home.slice(1).replace(/[^a-zA-Z0-9]/g, '-')  // "/Users/tony.hoff" → "Users-tony-hoff"
   const prefix = '-' + encodedHome
   if (dirName === prefix) return home
   if (dirName.startsWith(prefix + '-')) {
@@ -97,6 +97,17 @@ function scanAssets(claudeDir = DEFAULT_CLAUDE_DIR) {
       const claudeMd = path.join(projPath, 'CLAUDE.md')
       if (fs.existsSync(claudeMd)) {
         assets.push({ type: 'claude-md', name: projPath, filePath: claudeMd })
+      }
+
+      // Skills in <project>/.claude/skills/
+      const projSkillsDir = path.join(projPath, '.claude', 'skills')
+      if (fs.existsSync(projSkillsDir)) {
+        for (const entry of fs.readdirSync(projSkillsDir)) {
+          const skillMd = path.join(projSkillsDir, entry, 'SKILL.md')
+          if (fs.existsSync(skillMd)) {
+            assets.push({ type: 'skill', name: entry, filePath: skillMd, project: projPath })
+          }
+        }
       }
     }
   }
