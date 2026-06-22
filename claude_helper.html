@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Claude Helper</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0 }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #222 }
+    a, button.link { color: #0066cc; text-decoration: none; background: none; border: none; cursor: pointer; font: inherit; padding: 0 }
+    a:hover, button.link:hover { text-decoration: underline }
+    button { cursor: pointer; border-radius: 4px; font-size: .9rem; padding: 7px 16px; border: 1px solid #ccc; background: #fff }
+    button:hover { background: #f0f0f0 }
+    .btn-primary { background: #0066cc; color: #fff; border-color: #0055bb }
+    .btn-primary:hover { background: #0055bb }
+    .btn-secondary { color: #555; border-color: #ddd }
+
+    /* Setup */
+    .setup { max-width: 480px; margin: 80px auto; padding: 0 24px; text-align: center }
+    .setup h1 { font-size: 1.7rem; margin-bottom: 10px }
+    .setup p { color: #555; line-height: 1.6; margin-bottom: 10px }
+    .setup code { background: #f0f0f0; padding: 2px 6px; border-radius: 3px; font-size: .88em }
+    .setup .actions { display: flex; gap: 8px; justify-content: center; margin-top: 16px }
+    .loading { color: #888; font-style: italic }
+    .err { color: #c00 }
+    .hint { font-size: .82rem; color: #999; margin-top: 10px }
+    kbd { background: #f0f0f0; border: 1px solid #ccc; border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: .9em }
+
+    /* Index */
+    .wrap { max-width: 900px; margin: 0 auto; padding: 0 20px 48px }
+    .topbar { display: flex; align-items: flex-start; justify-content: space-between; padding: 24px 0 20px; gap: 12px }
+    .topbar h1 { font-size: 1.5rem; margin-bottom: 4px }
+    .subtitle { color: #666; font-size: .88rem }
+    .subtitle code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: .9em }
+    .topbar-btns { display: flex; gap: 8px; flex-shrink: 0; padding-top: 4px }
+    .section { margin-bottom: 32px }
+    .section h2 { font-size: .95rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em;
+      color: #888; border-bottom: 1px solid #ddd; padding-bottom: 6px; margin-bottom: 12px }
+    .asset-list { list-style: none }
+    .asset-list li { padding: 6px 0; border-bottom: 1px solid #eee }
+    .asset-list li:last-child { border-bottom: none }
+    .asset-path { font-size: .8rem; color: #999; margin-left: 8px; font-family: monospace }
+    .empty { color: #aaa; font-style: italic; font-size: .9rem }
+    .project-group { margin-bottom: 14px }
+    .project-header { font-size: .82rem; font-family: monospace; color: #555;
+      padding: 4px 0; border-bottom: 1px solid #e0e0e0; margin-bottom: 4px }
+    .memory-list { list-style: none; padding-left: 16px }
+    .memory-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0 }
+    .memory-list li:last-child { border-bottom: none }
+
+    /* Modal */
+    .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45);
+      z-index: 100; align-items: center; justify-content: center }
+    .modal.open { display: flex }
+    .modal-box { background: #fff; border-radius: 8px; width: 90%; max-width: 820px;
+      max-height: 87vh; display: flex; flex-direction: column; overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,.2) }
+    .modal-head { display: flex; align-items: flex-start; justify-content: space-between;
+      padding: 16px 20px 12px; border-bottom: 1px solid #eee; gap: 12px }
+    .modal-head .close { background: none; border: none; font-size: 1.5rem; color: #999;
+      line-height: 1; cursor: pointer; padding: 0; flex-shrink: 0 }
+    .modal-head .close:hover { color: #333; background: none }
+    .type-badge { display: inline-block; background: #e8f0fe; color: #1a56db; border-radius: 4px;
+      padding: 2px 8px; font-size: .72rem; font-weight: 600; text-transform: uppercase; margin-bottom: 6px }
+    .modal-title { font-size: 1.1rem; font-weight: 600; word-break: break-all }
+    .modal-path { font-size: .78rem; color: #888; margin-top: 3px; font-family: monospace; word-break: break-all }
+    .modal-body { padding: 20px 24px; overflow-y: auto }
+    .modal-body pre { background: #f8f8f8; border: 1px solid #e0e0e0; border-radius: 4px;
+      padding: 14px; overflow-x: auto; font-size: .85rem; line-height: 1.5; white-space: pre-wrap; word-break: break-all }
+    .modal-body h1,.modal-body h2,.modal-body h3 { margin: 1em 0 .4em }
+    .modal-body p { margin: .6em 0; line-height: 1.6 }
+    .modal-body ul,.modal-body ol { margin: .6em 0 .6em 1.5em }
+    .modal-body li { margin: .2em 0 }
+    .modal-body code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: .9em }
+    .modal-body table { border-collapse: collapse; width: 100%; margin: .8em 0 }
+    .modal-body th,.modal-body td { border: 1px solid #ddd; padding: 6px 10px; text-align: left }
+    .modal-body th { background: #f5f5f5 }
+    .modal-body blockquote { border-left: 3px solid #ccc; margin: .8em 0; padding: .4em 1em; color: #555 }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<div id="modal" class="modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div id="modal-meta"></div>
+      <button class="close" id="modal-close">×</button>
+    </div>
+    <div id="modal-body" class="modal-body"></div>
+  </div>
+</div>
+<script>
+'use strict'
+
+// ── IndexedDB ─────────────────────────────────────────────────────────────────
+let _db
+async function idb() {
+  if (_db) return _db
+  return (_db = await new Promise((res, rej) => {
+    const r = indexedDB.open('claude-helper', 1)
+    r.onupgradeneeded = e => e.target.result.createObjectStore('kv')
+    r.onsuccess = e => res(e.target.result)
+    r.onerror = () => rej(r.error)
+  }))
+}
+function tx(mode, fn) {
+  return new Promise(async (res, rej) => {
+    const r = fn((await idb()).transaction('kv', mode).objectStore('kv'))
+    r.onsuccess = () => res(r.result)
+    r.onerror = () => rej(r.error)
+  })
+}
+const kget = k => tx('readonly', s => s.get(k))
+const kput = (k, v) => tx('readwrite', s => s.put(v, k))
+const kdel = k => tx('readwrite', s => s.delete(k))
+
+// ── Handle permission ─────────────────────────────────────────────────────────
+async function permitted(h) {
+  if (!h) return false
+  try {
+    if (await h.queryPermission({ mode: 'read' }) === 'granted') return true
+    return await h.requestPermission({ mode: 'read' }) === 'granted'
+  } catch { return false }
+}
+
+// ── Path helpers ──────────────────────────────────────────────────────────────
+function naiveDecode(dirName) {
+  return dirName.replace(/^-/, '/').replace(/-/g, '/')
+}
+
+function commonAncestor(paths) {
+  const parts = paths.filter(Boolean).map(p => p.split('/').filter(Boolean))
+  if (!parts.length) return null
+  const len = Math.min(...parts.map(p => p.length))
+  let i = 0
+  while (i < len && parts.every(p => p[i] === parts[0][i])) i++
+  return i ? '/' + parts[0].slice(0, i).join('/') : null
+}
+
+function shortenPath(p) {
+  return p ? p.replace(/^\/[^/]+\/[^/]+/, '~') : p
+}
+
+// ── Filesystem helpers ────────────────────────────────────────────────────────
+async function getDir(h, ...parts) {
+  for (const p of parts) {
+    try { h = await h.getDirectoryHandle(p) } catch { return null }
+  }
+  return h
+}
+
+// Walk dash-joined segments, trying to match real directory names that may contain dashes.
+// Returns { handle, path } or null.
+async function resolveSegs(handle, segs, basePath) {
+  if (!segs.length) return { handle, path: basePath }
+  let acc = ''
+  for (let i = 0; i < segs.length; i++) {
+    acc = acc ? acc + '-' + segs[i] : segs[i]
+    try {
+      const next = await handle.getDirectoryHandle(acc)
+      const nextPath = basePath + '/' + acc
+      if (i === segs.length - 1) return { handle: next, path: nextPath }
+      const result = await resolveSegs(next, segs.slice(i + 1), nextPath)
+      if (result) return result
+    } catch { /* try accumulating more */ }
+  }
+  return null
+}
+
+// Navigate from handle to naivePath by trying increasingly short suffixes.
+// e.g. homeHandle + '/Users/mike/dev' → tries dev/, then mike/dev/, etc.
+// Uses resolveSegs so dash-containing names (e.g. my-project) are handled.
+async function findRelative(handle, naivePath) {
+  const segs = naivePath.split('/').filter(Boolean)
+  for (let i = 0; i < segs.length; i++) {
+    const result = await resolveSegs(handle, segs.slice(i), '')
+    if (result) return result.handle
+  }
+  return null
+}
+
+async function readText(handle, ...parts) {
+  try {
+    let h = handle
+    const fname = parts.pop()
+    for (const p of parts) h = await h.getDirectoryHandle(p)
+    return await (await (await h.getFileHandle(fname)).getFile()).text()
+  } catch { return null }
+}
+
+// ── Scanner ───────────────────────────────────────────────────────────────────
+async function scanClaude(handle) {
+  const assets = []
+  const projDirNames = []
+
+  // Skills
+  const skillsDir = await getDir(handle, 'skills')
+  if (skillsDir) {
+    for await (const [name, entry] of skillsDir.entries()) {
+      if (entry.kind !== 'directory') continue
+      const content = await readText(entry, 'SKILL.md')
+      if (content != null)
+        assets.push({ type: 'skill', name, content, path: `~/.claude/skills/${name}/SKILL.md` })
+    }
+  }
+
+  // Plans
+  const plansDir = await getDir(handle, 'plans')
+  if (plansDir) {
+    for await (const [name, entry] of plansDir.entries()) {
+      if (entry.kind !== 'file' || !name.endsWith('.md')) continue
+      const content = await (await entry.getFile()).text()
+      assets.push({ type: 'plan', name: name.slice(0, -3), content, path: `~/.claude/plans/${name}` })
+    }
+  }
+
+  // Settings
+  for (const fname of ['settings.json', 'settings.local.json']) {
+    const content = await readText(handle, fname)
+    if (content != null)
+      assets.push({ type: 'settings', name: fname, content, path: `~/.claude/${fname}` })
+  }
+
+  // Projects — memory files
+  const projectsDir = await getDir(handle, 'projects')
+  if (projectsDir) {
+    for await (const [dirName, projEntry] of projectsDir.entries()) {
+      if (projEntry.kind !== 'directory') continue
+      projDirNames.push(dirName)
+      const projPath = naiveDecode(dirName)
+      const memDir = await getDir(projEntry, 'memory')
+      if (!memDir) continue
+      for await (const [memName, memEntry] of memDir.entries()) {
+        if (memEntry.kind !== 'file' || !memName.endsWith('.md')) continue
+        const content = await (await memEntry.getFile()).text()
+        assets.push({ type: 'memory', name: memName.slice(0, -3), content,
+          path: `~/.claude/projects/${dirName}/memory/${memName}`,
+          project: projPath, isIndex: memName === 'MEMORY.md' })
+      }
+    }
+  }
+
+  return { assets, projDirNames }
+}
+
+async function scanDev(devHandle, devRoot, projDirNames) {
+  const assets = []
+  for (const dirName of projDirNames) {
+    const naivePath = naiveDecode(dirName)
+    if (!naivePath.startsWith(devRoot + '/')) continue
+    const relSegs = naivePath.slice(devRoot.length + 1).split('/')
+    const resolved = await resolveSegs(devHandle, relSegs, devRoot)
+    if (!resolved) continue
+    const { handle: projDir, path: projPath } = resolved
+
+    const claudeContent = await readText(projDir, 'CLAUDE.md')
+    if (claudeContent != null)
+      assets.push({ type: 'claude-md', name: projPath, content: claudeContent, path: projPath + '/CLAUDE.md' })
+
+    const skillsDir = await getDir(projDir, '.claude', 'skills')
+    if (!skillsDir) continue
+    for await (const [name, entry] of skillsDir.entries()) {
+      if (entry.kind !== 'directory') continue
+      const content = await readText(entry, 'SKILL.md')
+      if (content != null)
+        assets.push({ type: 'skill', name, content,
+          path: `${projPath}/.claude/skills/${name}/SKILL.md`, project: projPath })
+    }
+  }
+  return assets
+}
+
+// ── Renderer ──────────────────────────────────────────────────────────────────
+const TYPE_LABELS = { skill: 'Skills', plan: 'Plans', settings: 'Settings', memory: 'Memory', 'claude-md': 'CLAUDE.md Files' }
+const TYPE_ORDER = ['claude-md', 'skill', 'memory', 'plan', 'settings']
+
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+}
+
+function renderContent(asset) {
+  if (!asset.content) return '<em>Empty</em>'
+  if (asset.path.endsWith('.json')) {
+    try { return `<pre>${esc(JSON.stringify(JSON.parse(asset.content), null, 2))}</pre>` }
+    catch { return `<pre>${esc(asset.content)}</pre>` }
+  }
+  try {
+    return typeof marked !== 'undefined'
+      ? marked.parse(asset.content)
+      : `<pre>${esc(asset.content)}</pre>`
+  } catch { return `<pre>${esc(asset.content)}</pre>` }
+}
+
+function buildIndex(assets, devRoot) {
+  assets.forEach((a, i) => { a._id = i })
+  const byType = {}
+  for (const a of assets) (byType[a.type] = byType[a.type] || []).push(a)
+
+  const sections = TYPE_ORDER.map(type => {
+    const label = TYPE_LABELS[type] || type
+    const list = byType[type] || []
+    let items
+
+    if (type === 'memory') {
+      if (!list.length) {
+        items = '<p class="empty">None found</p>'
+      } else {
+        const byProj = {}, order = []
+        for (const a of list) {
+          const p = a.project || '(unknown)'
+          if (!byProj[p]) { byProj[p] = []; order.push(p) }
+          byProj[p].push(a)
+        }
+        items = order.map(proj => {
+          const all = byProj[proj]
+          const idx = all.find(a => a.isIndex)
+          const children = all.filter(a => !a.isIndex).map(a =>
+            `<li><button class="link al" data-id="${a._id}">${esc(a.name)}</button></li>`
+          ).join('')
+          const hdr = idx
+            ? `<button class="link al" data-id="${idx._id}">${esc(shortenPath(proj))}</button>`
+            : esc(shortenPath(proj))
+          return `<div class="project-group"><div class="project-header">${hdr}</div><ul class="memory-list">${children}</ul></div>`
+        }).join('')
+      }
+    } else {
+      items = !list.length
+        ? '<p class="empty">None found</p>'
+        : `<ul class="asset-list">${list.map(a => {
+            const sub = `<span class="asset-path">${esc(shortenPath(a.project || a.path))}</span>`
+            return `<li><button class="link al" data-id="${a._id}">${esc(a.name)}</button>${sub}</li>`
+          }).join('')}</ul>`
+    }
+    return `<div class="section"><h2>${label}</h2>${items}</div>`
+  }).join('')
+
+  const devLabel = devRoot ? ` + <code>${esc(shortenPath(devRoot))}</code>` : ''
+  return `<div class="wrap">
+    <div class="topbar">
+      <div>
+        <h1>Claude Helper</h1>
+        <p class="subtitle">${assets.length} asset${assets.length !== 1 ? 's' : ''} in <code>~/.claude</code>${devLabel}</p>
+      </div>
+      <div class="topbar-btns">
+        <button id="btn-refresh" class="btn-primary">↺ Refresh</button>
+        <button id="btn-reset" class="btn-secondary">Reset access</button>
+      </div>
+    </div>
+    ${sections}
+  </div>`
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+const appEl = document.getElementById('app')
+const modalEl = document.getElementById('modal')
+const modalMeta = document.getElementById('modal-meta')
+const modalBody = document.getElementById('modal-body')
+
+function closeModal() { modalEl.classList.remove('open') }
+document.getElementById('modal-close').onclick = closeModal
+modalEl.onclick = e => { if (e.target === modalEl) closeModal() }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal() })
+
+// Single delegated listener for asset clicks — safe across re-renders
+appEl.addEventListener('click', e => {
+  const btn = e.target.closest('.al')
+  if (!btn) return
+  e.preventDefault()
+  const id = parseInt(btn.dataset.id)
+  const asset = state.assets[id]
+  if (!asset) return
+  modalMeta.innerHTML = `
+    <div class="type-badge">${esc(TYPE_LABELS[asset.type] || asset.type)}</div>
+    <div class="modal-title">${esc(asset.name)}</div>
+    <div class="modal-path">${esc(asset.path)}</div>`
+  modalBody.innerHTML = renderContent(asset)
+  modalEl.classList.add('open')
+})
+
+let state = { claudeHandle: null, devHandle: null, devRoot: null, assets: [] }
+
+function setStatus(html) {
+  appEl.innerHTML = `<div class="setup">${html}</div>`
+}
+
+async function run() {
+  setStatus('<p class="loading">Scanning ~/.claude…</p>')
+  try {
+    const { assets: ca, projDirNames } = await scanClaude(state.claudeHandle)
+
+    // Compute the common ancestor of all project paths and ask the user to
+    // locate that folder if we don't already have a handle for it.
+    // Filter to paths at least 3 levels deep (/Users/name/something) so that
+    // bare home-dir entries like -Users-mike don't pull the ancestor up to ~
+    const projPaths = projDirNames.map(naiveDecode)
+      .filter(p => p.split('/').filter(Boolean).length >= 3)
+    const suggested = commonAncestor(projPaths)
+
+    if (!state.devHandle && suggested && projDirNames.length) {
+      const short = shortenPath(suggested)
+      setStatus(`
+        <h1>Claude Helper</h1>
+        <p>Found ${ca.length} assets in <code>~/.claude</code>.</p>
+        <p>To also find <code>CLAUDE.md</code> files and project skills, select your projects root folder.</p>
+        <p>Based on your project list, that folder is <strong><code>${esc(short)}</code></strong>.</p>
+        <div class="actions">
+          <button id="btn-grant" class="btn-primary">Open ${esc(short)}</button>
+          <button id="btn-skip" class="btn-secondary">Skip</button>
+        </div>`)
+
+      await new Promise(res => {
+        document.getElementById('btn-grant').onclick = async () => {
+          try {
+            const h = await window.showDirectoryPicker({ mode: 'read' })
+            state.devHandle = h
+            state.devRoot = suggested
+            await kput('devHandle', h)
+            await kput('devRoot', suggested)
+          } catch (e) { if (e.name !== 'AbortError') console.warn(e) }
+          res()
+        }
+        document.getElementById('btn-skip').onclick = () => res()
+      })
+    }
+
+    if (state.devHandle) {
+      setStatus('<p class="loading">Scanning project directories…</p>')
+      const da = await scanDev(state.devHandle, state.devRoot, projDirNames)
+      state.assets = [...ca, ...da]
+    } else {
+      state.assets = ca
+    }
+
+    appEl.innerHTML = buildIndex(state.assets, state.devRoot)
+    document.getElementById('btn-refresh').onclick = run
+    document.getElementById('btn-reset').onclick = async () => {
+      await Promise.all([kdel('claudeHandle'), kdel('devHandle'), kdel('devRoot')])
+      state = { claudeHandle: null, devHandle: null, devRoot: null, assets: [] }
+      init()
+    }
+  } catch (err) {
+    setStatus(`<p class="err">Error: ${esc(err.message)}</p>
+      <div class="actions"><button id="btn-retry" class="btn-primary">Retry</button></div>`)
+    document.getElementById('btn-retry').onclick = run
+  }
+}
+
+async function init() {
+  if (!('showDirectoryPicker' in window)) {
+    setStatus('<p class="err">This app requires Chrome or Edge — File System Access API is unavailable in this browser.</p>')
+    return
+  }
+
+  const [storedClaude, storedDev, storedDevRoot] = await Promise.all([
+    kget('claudeHandle'), kget('devHandle'), kget('devRoot')
+  ])
+
+  if (storedClaude && await permitted(storedClaude)) {
+    state.claudeHandle = storedClaude
+    if (storedDev && await permitted(storedDev)) {
+      state.devHandle = storedDev
+      state.devRoot = storedDevRoot
+    }
+    run()
+    return
+  }
+
+  setStatus(`
+    <h1>Claude Helper</h1>
+    <p>Browse your Claude Code assets — skills, memory, plans, settings, and CLAUDE.md files.</p>
+    <p style="font-size:.82rem;color:#999">Requires Chrome or Edge. Access is stored locally and persists across sessions.</p>
+    <div class="actions"><button id="btn-open" class="btn-primary">Open ~/.claude folder</button></div>
+    <p class="hint">On a Mac, press <kbd>Cmd+Shift+.</kbd> in the picker to show dot files.</p>`)
+
+  document.getElementById('btn-open').onclick = async () => {
+    try {
+      const h = await window.showDirectoryPicker({ mode: 'read' })
+      state.claudeHandle = h
+      await kput('claudeHandle', h)
+      run()
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        setStatus(`<p class="err">${esc(e.message)}</p>
+          <div class="actions"><button id="btn-retry" class="btn-primary">Try again</button></div>`)
+        document.getElementById('btn-retry').onclick = init
+      }
+    }
+  }
+}
+
+init()
+</script>
+</body>
+</html>
