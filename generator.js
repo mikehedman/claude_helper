@@ -120,7 +120,7 @@ function memoryItems(list) {
   }).join('\n')
 }
 
-function indexHtml(assets) {
+function indexHtml(assets, claudeDir) {
   const byType = {}
   for (const a of assets) {
     if (!byType[a.type]) byType[a.type] = []
@@ -145,6 +145,7 @@ function indexHtml(assets) {
   }).join('\n')
 
   const total = assets.length
+  const displayDir = claudeDir.replace(process.env.HOME, '~')
   return `<!DOCTYPE html>
 <html lang="en">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -154,7 +155,7 @@ function indexHtml(assets) {
 <body>
 <div class="index-wrap">
   <h1>Claude Helper</h1>
-  <p class="subtitle">${total} asset${total !== 1 ? 's' : ''} found in <code>~/.claude</code></p>
+  <p class="subtitle">${total} asset${total !== 1 ? 's' : ''} found in <code>${escapeHtml(displayDir)}</code></p>
   ${sections}
 </div>
 </body>
@@ -190,7 +191,7 @@ function detailHtml(asset) {
 </html>`
 }
 
-function generateSite(assets, outputDir) {
+function generateSite(assets, outputDir, claudeDir) {
   const assetsDir = path.join(outputDir, 'assets')
 
   if (fs.existsSync(outputDir)) {
@@ -198,7 +199,7 @@ function generateSite(assets, outputDir) {
   }
   fs.mkdirSync(assetsDir, { recursive: true })
 
-  fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml(assets), 'utf8')
+  fs.writeFileSync(path.join(outputDir, 'index.html'), indexHtml(assets, claudeDir), 'utf8')
 
   for (const asset of assets) {
     const slug = slugify(asset.filePath)

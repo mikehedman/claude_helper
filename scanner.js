@@ -3,7 +3,7 @@
 const fs = require('fs')
 const path = require('path')
 
-const CLAUDE_DIR = path.join(process.env.HOME, '.claude')
+const DEFAULT_CLAUDE_DIR = path.join(process.env.HOME, '.claude')
 
 function glob(dir, ext) {
   if (!fs.existsSync(dir)) return []
@@ -12,16 +12,46 @@ function glob(dir, ext) {
     .map(f => path.join(dir, f))
 }
 
+// Claude encodes paths by replacing '/' with '-', which is lossy: a dash in an
+// encoded name could be a path separator OR a literal dash in a directory name.
+// We resolve the ambiguity by walking the real filesystem: accumulate dash-joined
+// segments into a candidate component and recurse when a real directory is found.
+// Falls back to naive decode when the path doesn't exist locally (other machines).
+function resolveSegments(base, segs) {
+  if (segs.length === 0) return base
+  try { if (!fs.statSync(base).isDirectory()) return null } catch { return null }
+  let current = ''
+  for (let i = 0; i < segs.length; i++) {
+    current = current ? current + '-' + segs[i] : segs[i]
+    const candidate = path.join(base, current)
+    let isDir = false
+    try { isDir = fs.statSync(candidate).isDirectory() } catch { /* skip */ }
+    if (isDir) {
+      if (i === segs.length - 1) return candidate
+      const result = resolveSegments(candidate, segs.slice(i + 1))
+      if (result !== null) return result
+    }
+  }
+  return null
+}
+
 function decodeProjDir(dirName) {
-  // "-Users-mike-dev-foo" → "/Users/mike/dev/foo"
+  const home = process.env.HOME
+  const encodedHome = home.slice(1).replace(/\//g, '-')  // "/Users/tony.hoff" → "Users-tony.hoff"
+  const prefix = '-' + encodedHome
+  if (dirName === prefix) return home
+  if (dirName.startsWith(prefix + '-')) {
+    const segs = dirName.slice(prefix.length + 1).split('-')
+    return resolveSegments(home, segs) || home + '/' + segs.join('/')
+  }
   return dirName.replace(/^-/, '/').replace(/-/g, '/')
 }
 
-function scanAssets() {
+function scanAssets(claudeDir = DEFAULT_CLAUDE_DIR) {
   const assets = []
 
   // Skills — each skill is a subdirectory containing SKILL.md
-  const skillsDir = path.join(CLAUDE_DIR, 'skills')
+  const skillsDir = path.join(claudeDir, 'skills')
   if (fs.existsSync(skillsDir)) {
     for (const entry of fs.readdirSync(skillsDir)) {
       const skillMd = path.join(skillsDir, entry, 'SKILL.md')
@@ -32,21 +62,21 @@ function scanAssets() {
   }
 
   // Plans
-  const plansDir = path.join(CLAUDE_DIR, 'plans')
+  const plansDir = path.join(claudeDir, 'plans')
   for (const fp of glob(plansDir, '.md')) {
     assets.push({ type: 'plan', name: path.basename(fp, '.md'), filePath: fp })
   }
 
   // Settings
   for (const fname of ['settings.json', 'settings.local.json']) {
-    const fp = path.join(CLAUDE_DIR, fname)
+    const fp = path.join(claudeDir, fname)
     if (fs.existsSync(fp)) {
       assets.push({ type: 'settings', name: fname, filePath: fp })
     }
   }
 
-  // Project memory files and CLAUDE.md
-  const projectsDir = path.join(CLAUDE_DIR, 'projects')
+  // Proje`ct memory files and CLAUDE.md
+  const projectsDir = path.join(claudeDir, 'projects')
   if (fs.existsSync(projectsDir)) {
     for (const dirName of fs.readdirSync(projectsDir)) {
       const projDir = path.join(projectsDir, dirName)
