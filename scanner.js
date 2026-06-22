@@ -20,10 +20,15 @@ function decodeProjDir(dirName) {
 function scanAssets() {
   const assets = []
 
-  // Skills
+  // Skills — each skill is a subdirectory containing SKILL.md
   const skillsDir = path.join(CLAUDE_DIR, 'skills')
-  for (const fp of glob(skillsDir, '.md')) {
-    assets.push({ type: 'skill', name: path.basename(fp, '.md'), filePath: fp })
+  if (fs.existsSync(skillsDir)) {
+    for (const entry of fs.readdirSync(skillsDir)) {
+      const skillMd = path.join(skillsDir, entry, 'SKILL.md')
+      if (fs.existsSync(skillMd)) {
+        assets.push({ type: 'skill', name: entry, filePath: skillMd })
+      }
+    }
   }
 
   // Plans
