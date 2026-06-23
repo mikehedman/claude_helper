@@ -61,6 +61,10 @@
     .modal-head .close { background: none; border: none; font-size: 1.5rem; color: #999;
       line-height: 1; cursor: pointer; padding: 0; flex-shrink: 0 }
     .modal-head .close:hover { color: #333; background: none }
+    .modal-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; padding-top: 2px }
+    .btn-promote { font-size: .8rem; padding: 4px 10px; background: #f0faf0; color: #2a7a2a; border-color: #a0cfa0 }
+    .btn-promote:hover { background: #d8f0d8 }
+    .btn-promote:disabled { opacity: .6; cursor: default }
     .type-badge { display: inline-block; background: #e8f0fe; color: #1a56db; border-radius: 4px;
       padding: 2px 8px; font-size: .72rem; font-weight: 600; text-transform: uppercase; margin-bottom: 6px }
     .modal-title { font-size: 1.1rem; font-weight: 600; word-break: break-all }
@@ -85,7 +89,10 @@
   <div class="modal-box">
     <div class="modal-head">
       <div id="modal-meta"></div>
-      <button class="close" id="modal-close">×</button>
+      <div class="modal-actions">
+        <button id="btn-promote" class="btn-promote" style="display:none">Promote to global</button>
+        <button class="close" id="modal-close">×</button>
+      </div>
     </div>
     <div id="modal-body" class="modal-body"></div>
   </div>
@@ -362,6 +369,39 @@ document.getElementById('modal-close').onclick = closeModal
 modalEl.onclick = e => { if (e.target === modalEl) closeModal() }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal() })
 
+const promoteBtn = document.getElementById('btn-promote')
+
+async function promoteSkill(asset) {
+  let perm
+  try {
+    perm = await state.claudeHandle.requestPermission({ mode: 'readwrite' })
+  } catch (e) {
+    alert('Could not get write permission: ' + e.message)
+    return
+  }
+  if (perm !== 'granted') { alert('Write permission denied.'); return }
+
+  try {
+    const skillsDir = await state.claudeHandle.getDirectoryHandle('skills', { create: true })
+
+    // Warn if a global skill with this name already exists
+    let exists = false
+    try { await skillsDir.getDirectoryHandle(asset.name); exists = true } catch {}
+    if (exists && !confirm(`A global skill named "${asset.name}" already exists. Overwrite?`)) return
+
+    const skillDir = await skillsDir.getDirectoryHandle(asset.name, { create: true })
+    const fileHandle = await skillDir.getFileHandle('SKILL.md', { create: true })
+    const writable = await fileHandle.createWritable()
+    await writable.write(asset.content)
+    await writable.close()
+
+    promoteBtn.textContent = 'Promoted ✓'
+    promoteBtn.disabled = true
+  } catch (e) {
+    alert('Error promoting skill: ' + e.message)
+  }
+}
+
 // Single delegated listener for asset clicks — safe across re-renders
 appEl.addEventListener('click', e => {
   const btn = e.target.closest('.al')
@@ -375,6 +415,17 @@ appEl.addEventListener('click', e => {
     <div class="modal-title">${esc(asset.name)}</div>
     <div class="modal-path">${esc(asset.path)}</div>`
   modalBody.innerHTML = renderContent(asset)
+
+  // Show Promote button only for project-level skills
+  if (asset.type === 'skill' && asset.project) {
+    promoteBtn.style.display = ''
+    promoteBtn.textContent = 'Promote to global'
+    promoteBtn.disabled = false
+    promoteBtn.onclick = () => promoteSkill(asset)
+  } else {
+    promoteBtn.style.display = 'none'
+  }
+
   modalEl.classList.add('open')
 })
 

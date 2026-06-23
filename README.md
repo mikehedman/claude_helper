@@ -1,6 +1,6 @@
 # Claude Helper
 
-Browses your Claude Code assets — skills, memory, plans, settings, and CLAUDE.md files. Two options: a Node.js static site generator, or a self-contained browser app.
+A single-file browser app for browsing your Claude Code assets — skills, memory, plans, settings, and CLAUDE.md files.
 
 ## What it finds
 
@@ -12,11 +12,9 @@ Browses your Claude Code assets — skills, memory, plans, settings, and CLAUDE.
 | Plans | `~/.claude/plans/` |
 | Settings | `~/.claude/settings.json`, `~/.claude/settings.local.json` |
 
----
+## Usage
 
-## Option 1 — Browser app (`claude_helper.html`)
-
-Open `claude_helper.html` directly in Chrome or Edge. No install required.
+Open `claude_helper.html` in Chrome or Edge. No install required.
 
 **First run:**
 
@@ -28,50 +26,8 @@ Open `claude_helper.html` directly in Chrome or Edge. No install required.
 
 Use the **Reset access** button to clear stored handles and start over.
 
+## Promoting project skills
+
+Project-level skills (under `<project>/.claude/skills/`) can be promoted to global skills (`~/.claude/skills/`). Open any project skill and click **Promote to global** in the modal header.
+
 > Requires Chrome or Edge (uses the File System Access API).
-
----
-
-## Option 2 — Node.js generator
-
-Generates a static site you can open in any browser.
-
-```bash
-npm install
-npm start
-```
-
-Then open the printed path in your browser (File > Open):
-
-```
-/path/to/claude_helper/output/index.html
-```
-
-Re-run `npm start` any time to regenerate with the latest files.
-
-### Multiple Claude directories
-
-If you have more than one `~/.claude*` directory (e.g. `~/.claude` and `~/.claude-work`), use the `select` script to pick which one to scan:
-
-```bash
-npm run select
-```
-
-You'll see a numbered prompt:
-
-```
-Found Claude directories:
-  1) ~/.claude
-  2) ~/.claude-work
-
-Select [1-2] (default 1):
-```
-
-Press Enter to accept the default, or type a number and press Enter.
-
-### Output
-
-The generator writes a static site to `output/`:
-
-- `output/index.html` — all assets listed by type, each linking to a detail page
-- `output/assets/*.html` — individual asset pages with rendered content (Markdown → HTML, JSON → formatted `<pre>`)
