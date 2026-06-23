@@ -26,7 +26,7 @@ Open `claude_helper.html` directly in Chrome or Edge. No install required.
 
 **After setup**, a **Refresh** button re-scans everything with no further prompts. Folder access is stored in the browser and persists across sessions.
 
-Use **Reset access** to clear stored handles and start over.
+Use the **Reset access** button to clear stored handles and start over.
 
 > Requires Chrome or Edge (uses the File System Access API).
 
