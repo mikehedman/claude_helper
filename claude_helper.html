@@ -111,9 +111,9 @@ function tx(mode, fn) {
     r.onerror = () => rej(r.error)
   })
 }
-const kget = k => tx('readonly', s => s.get(k))
-const kput = (k, v) => tx('readwrite', s => s.put(v, k))
-const kdel = k => tx('readwrite', s => s.delete(k))
+const dbGet = key => tx('readonly', store => store.get(key))
+const dbPut = (key, val) => tx('readwrite', store => store.put(val, key))
+const dbDel = key => tx('readwrite', store => store.delete(key))
 
 // ── Handle permission ─────────────────────────────────────────────────────────
 async function permitted(h) {
@@ -387,7 +387,7 @@ function setStatus(html) {
 async function run() {
   setStatus('<p class="loading">Scanning ~/.claude…</p>')
   try {
-    const { assets: ca, projDirNames } = await scanClaude(state.claudeHandle)
+    const { assets: claudeAssets, projDirNames } = await scanClaude(state.claudeHandle)
 
     // Compute the common ancestor of all project paths and ask the user to
     // locate that folder if we don't already have a handle for it.
@@ -401,7 +401,7 @@ async function run() {
       const short = shortenPath(suggested)
       setStatus(`
         <h1>Claude Helper</h1>
-        <p>Found ${ca.length} assets in <code>~/.claude</code>.</p>
+        <p>Found ${claudeAssets.length} assets in <code>~/.claude</code>.</p>
         <p>To also find <code>CLAUDE.md</code> files and project skills, select your projects root folder.</p>
         <p>Based on your project list, that folder is <strong><code>${esc(short)}</code></strong>.</p>
         <div class="actions">
@@ -415,8 +415,8 @@ async function run() {
             const h = await window.showDirectoryPicker({ mode: 'read' })
             state.devHandle = h
             state.devRoot = suggested
-            await kput('devHandle', h)
-            await kput('devRoot', suggested)
+            await dbPut('devHandle', h)
+            await dbPut('devRoot', suggested)
           } catch (e) { if (e.name !== 'AbortError') console.warn(e) }
           res()
         }
@@ -426,16 +426,16 @@ async function run() {
 
     if (state.devHandle) {
       setStatus('<p class="loading">Scanning project directories…</p>')
-      const da = await scanDev(state.devHandle, state.devRoot, projDirNames)
-      state.assets = [...ca, ...da]
+      const devAssets = await scanDev(state.devHandle, state.devRoot, projDirNames)
+      state.assets = [...claudeAssets, ...devAssets]
     } else {
-      state.assets = ca
+      state.assets = claudeAssets
     }
 
     appEl.innerHTML = buildIndex(state.assets, state.devRoot)
     document.getElementById('btn-refresh').onclick = run
     document.getElementById('btn-reset').onclick = async () => {
-      await Promise.all([kdel('claudeHandle'), kdel('devHandle'), kdel('devRoot')])
+      await Promise.all([dbDel('claudeHandle'), dbDel('devHandle'), dbDel('devRoot')])
       state = { claudeHandle: null, devHandle: null, devRoot: null, assets: [] }
       init()
     }
@@ -453,7 +453,7 @@ async function init() {
   }
 
   const [storedClaude, storedDev, storedDevRoot] = await Promise.all([
-    kget('claudeHandle'), kget('devHandle'), kget('devRoot')
+    dbGet('claudeHandle'), dbGet('devHandle'), dbGet('devRoot')
   ])
 
   if (storedClaude && await permitted(storedClaude)) {
@@ -477,7 +477,7 @@ async function init() {
     try {
       const h = await window.showDirectoryPicker({ mode: 'read' })
       state.claudeHandle = h
-      await kput('claudeHandle', h)
+      await dbPut('claudeHandle', h)
       run()
     } catch (e) {
       if (e.name !== 'AbortError') {
